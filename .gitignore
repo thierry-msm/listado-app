@@ -1,0 +1,49 @@
+# Ignorar pasta de dependências do Node.js
+node_modules/
+
+# Ignorar variáveis de ambiente
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Ignorar pastas de build/output
+.next/ # Next.js build output
+dist/   # Common build output
+
+# Ignorar arquivos de log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Ignorar arquivos específicos do sistema operacional/editor
+.DS_Store       # macOS
+Thumbs.db       # Windows
+.vscode/        # VS Code settings
+*.sublime-project # Sublime Text
+*.sublime-workspace
+
+# Ignorar arquivos temporários ou de cache
+*.swp
+*.swo
+
+# Ignorar arquivos de lock de pacotes, se não quiser versionar
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+# Recomenda-se versionar os arquivos de lock para garantir builds consistentes
+
+# Ignorar arquivos gerados pelo Prisma
+# Se você compila o cliente Prisma para um local específico fora do node_modules
+# prisma/client/
+
+# Ignorar cache do NPM/Yarn/pnpm
+.npm/
+.yarn/
+.pnpm-store/
+
+# Outros arquivos que você queira ignorar
+# uploads/
+# temp/
