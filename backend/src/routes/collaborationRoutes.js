@@ -3,7 +3,7 @@ const collaborationController = require('../controllers/collaborationController'
 
 async function collaborationRoutes(app) {
   // Aplica o middleware de autenticação a todas as rotas de colaboração
-  app.addHook('preHandler', app.request.authenticate);
+  app.addHook('preHandler', (request, reply) => request.authenticate(request, reply));
 
   // Rota para convidar um usuário para uma lista
   app.post('/:listId/invite', collaborationController.inviteUserToList);

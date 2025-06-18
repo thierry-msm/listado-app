@@ -10,10 +10,10 @@ async function authRoutes(app) {
 
   // Rota para obter o perfil do usuário autenticado
   // Antes de chamar o controlador, executa o hook 'authenticate'
-  app.get('/profile', { preHandler: [app.request.authenticate] }, authController.getProfile);
+  app.get('/profile', { preHandler: [(request, reply) => request.authenticate(request, reply)] }, authController.getProfile);
 
   // Rota para atualizar o perfil do usuário autenticado
-  app.put('/profile', { preHandler: [app.request.authenticate] }, authController.updateProfile);
+   app.put('/profile', { preHandler: [(request, reply) => request.authenticate(request, reply)] }, authController.updateProfile);
 }
 
 module.exports = authRoutes;

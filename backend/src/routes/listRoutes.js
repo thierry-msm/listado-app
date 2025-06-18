@@ -4,8 +4,7 @@ const listController = require('../controllers/listController');
 async function listRoutes(app) {
   // Aplica o middleware de autenticação a todas as rotas de lista
   // Isso garante que apenas usuários autenticados possam acessar estas rotas
-  app.addHook('preHandler', app.request.authenticate);
-
+    app.addHook('preHandler', (request, reply) => request.authenticate(request, reply));
   // Rota para criar uma nova lista
   app.post('/', listController.createList);
 

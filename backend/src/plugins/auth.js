@@ -18,7 +18,7 @@ async function jwtAuthPlugin(app, options) {
       // Pega o cabeçalho de autorização
       const authHeader = this.headers.authorization;
 
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      if (!authHeader || !authHeader.startsWith('Bearer')) {
         // Se o cabeçalho não existe ou não tem o formato correto, joga um erro 401
         throw app.httpErrors.unauthorized('Token de autenticação não fornecido ou inválido.');
       }
@@ -52,10 +52,6 @@ async function jwtAuthPlugin(app, options) {
       throw error;
     }
   });
-
-  // Torna a instância do PrismaClient acessível via `app.prisma`
-  // Isso é útil para que os controllers possam acessar o Prisma diretamente do app
-  app.decorate('prisma', app.db); // app.db é importado no server.js e passado para o app
 }
 
 // Exporta o plugin usando fastify-plugin para que ele possa ser usado em outras rotas e plugins

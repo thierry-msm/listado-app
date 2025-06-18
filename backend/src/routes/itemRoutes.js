@@ -3,7 +3,7 @@ const itemController = require('../controllers/itemController');
 
 async function itemRoutes(app) {
   // Aplica o middleware de autenticação a todas as rotas de item
-  app.addHook('preHandler', app.request.authenticate);
+    app.addHook('preHandler', (request, reply) => request.authenticate(request, reply));
 
   // Rota para adicionar um item a uma lista específica
   app.post('/:listId', itemController.addItemToList);
