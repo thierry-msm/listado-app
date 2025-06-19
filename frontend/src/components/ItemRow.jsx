@@ -70,6 +70,7 @@ const handleTogglePurchased = () => {
               onChange={(e) => setEditedName(e.target.value)}
               className="border p-1 rounded w-full"
               placeholder="Nome"
+              disabled={!canEditItemDetails}
             />
             <input
               type="number"
@@ -78,6 +79,7 @@ const handleTogglePurchased = () => {
               className="border p-1 rounded w-full"
               min="1"
               placeholder="Quantidade"
+              disabled={!canEditItemDetails}
             />
             <input
               type="number"
@@ -87,6 +89,7 @@ const handleTogglePurchased = () => {
               step="0.01"
               min="0"
               placeholder="Preço Sugerido"
+              disabled={!canEditItemDetails}
             />
             <input
               type="number"
@@ -115,6 +118,7 @@ const handleTogglePurchased = () => {
               value={editedPriority}
               onChange={(e) => setEditedPriority(e.target.value)}
               className="border p-1 rounded w-full"
+              disabled={!canEditItemDetails}
             >
               <option value="LOW">Baixa</option>
               <option value="MEDIUM">Média</option>
@@ -164,7 +168,8 @@ const handleTogglePurchased = () => {
                 {item.purchased ? <FaCheckCircle size={20} /> : <FaRegCircle size={20} />}
               </button>
             )}
-            {canEditItemDetails && (
+
+            {(canEditItemDetails || canMarkAsPurchased) && (
               <button onClick={() => setIsEditing(true)} className="text-blue-500 hover:text-blue-700 p-2" title="Editar Item">
                 <FaEdit size={20} />
               </button>
