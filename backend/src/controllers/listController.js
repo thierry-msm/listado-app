@@ -35,9 +35,25 @@ async function createList(request, reply) {
             user: { select: { id: true, name: true, email: true } },
           },
         },
+        _count: { // <-- ADICIONE ESTE BLOCO para incluir as contagens
+           select: { items: true, collaborations: true },
+        },
+        items: { // <-- ADICIONE ESTE INCLUDE para poder calcular pendingItemsCount
+           where: { purchased: false }, // Apenas itens não comprados
+           select: { id: true } // Não precisa de todos os dados, só o suficiente para contar
+        }
       },
     });
-    return reply.status(201).send(newList);
+
+    // Formata a resposta para ter pendingItemsCount e userRole, como em getMyLists
+    const formattedList = {
+        ...newList, // Copia as propriedades da lista criada (incluindo _count e items)
+        pendingItemsCount: newList.items.length, // Calcula a contagem de itens pendentes
+        userRole: 'admin', // O criador da lista sempre é o admin (e proprietário)
+        items: undefined // Remove o array de items detalhado que só foi usado para contar
+    };
+
+    return reply.status(201).send(formattedList); // <-- Envie o objeto formatado
   } catch (error) {
     request.log.error(error);
     return reply.status(500).send({ message: 'Erro ao criar lista.' });
