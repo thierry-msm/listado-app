@@ -143,6 +143,9 @@ async function getListById(request, reply) {
           },
         },
         items: {
+           where: { // <-- ADICIONE ESTE BLOCO WHERE
+            deletedAt: null, // <--- APENAS ITENS ONDE deletedAt É NULL
+          },
           orderBy: [ // Ordena os itens
             { purchased: 'asc' }, // Itens não comprados primeiro
             { name: 'asc' } // Depois por nome

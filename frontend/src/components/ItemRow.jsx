@@ -15,10 +15,25 @@ export default function ItemRow({ item, listId, onUpdate, onDelete, canMarkAsPur
   const [editedPriority, setEditedPriority] = useState(item.priority || 'MEDIUM');
 
 
-  const handleTogglePurchased = () => {
-    if (!canMarkAsPurchased) return;
-    onUpdate(item.id, { purchased: !item.purchased, actualPrice: item.purchased ? null : (item.actualPrice || item.priceLimit) });
-  };
+const handleTogglePurchased = () => {
+  if (!canMarkAsPurchased) return; // Verifica permissão
+
+  const itemId = item.id;
+  const currentStatus = item.purchased;
+  const updates = {};
+
+  if (currentStatus) { // Se o item está atualmente comprado, vamos DESMARCAR
+    updates.purchased = false;
+    updates.purchasedBy = null; // Limpa quem comprou
+    updates.purchasedAt = null; // Limpa quando comprou
+    updates.actualPrice = null; // Limpa o preço real
+  } else { // Se o item NÃO está comprado, vamos MARCAR
+    updates.purchased = true;
+    updates.actualPrice = item.actualPrice || item.priceLimit; // Mantém lógica anterior para marcar
+  }
+
+  onUpdate(itemId, updates); // Chama a função de atualização do pai
+};
 
   const handleSaveEdit = () => {
     onUpdate(item.id, {
