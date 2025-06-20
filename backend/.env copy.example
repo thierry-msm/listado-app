@@ -1,5 +1,0 @@
-# URL de conexão com o banco de dados PostgreSQL
-DATABASE_URL="postgresql://postgres:tranquila@localhost:5432/listado?schema=public"
-
-# Chave secreta para JWT (JSON Web Tokens) - Use uma string longa e aleatória
-JWT_SECRET="sua_chave_secreta_jwt_muito_segura_e_aleatoria_aqui"
