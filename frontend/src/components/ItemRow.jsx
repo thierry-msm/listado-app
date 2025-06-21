@@ -4,9 +4,6 @@ import { FaCheckCircle, FaRegCircle, FaTrash, FaEdit, FaTimes, FaSave } from 're
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// 1. Remova 'canEditItemDetails' da desestruturação das props.
-// 2. Use 'canEditAdminFields' para desabilitar/habilitar campos que só admins podem editar.
-// 3. Use 'canEditCollaboratorFields' para desabilitar/habilitar campos que admins E colaboradores podem editar.
 export default function ItemRow({
   item,
   listId,
@@ -15,7 +12,7 @@ export default function ItemRow({
   canMarkAsPurchased,
   canEditAdminFields,
   canEditCollaboratorFields,
-  currentUserId // Mantém, embora não seja usado para `disabled` aqui, pode ser útil para outras lógicas.
+  currentUserId // Mantido, caso precise para futuras lógicas que não alteram o item
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(item.name);
@@ -26,54 +23,107 @@ export default function ItemRow({
   const [editedCategory, setEditedCategory] = useState(item.category || '');
   const [editedPriority, setEditedPriority] = useState(item.priority || 'MEDIUM');
 
+  // Converte a string para Float, ou null se vazia
   const parseNumberInput = (value) => {
     const parsed = parseFloat(value);
     return isNaN(parsed) ? null : parsed;
   };
 
   const handleTogglePurchased = () => {
-    if (!canMarkAsPurchased) return;
+    if (!canMarkAsPurchased) {
+      console.warn("Usuário não tem permissão para marcar/desmarcar itens.");
+      return;
+    }
 
     const itemId = item.id;
     const currentStatus = item.purchased;
 
-    // Quando o status de comprado é alternado, é importante enviar todos os campos editáveis
-    // para garantir que qualquer mudança pendente na UI seja salva junto com a alteração de status.
+    // A payload para 'toggle purchased' deve ser minimalista e focada.
+    // Incluímos 'purchased' e 'actualPrice' (este último apenas se o usuário tiver permissão para modificá-lo)
     const updates = {
-      name: editedName,
-      quantity: parseInt(editedQuantity) || 1,
-      priceLimit: parseNumberInput(editedPriceLimit),
-      actualPrice: parseNumberInput(editedActualPrice),
-      notes: editedNotes,
-      category: editedCategory,
-      priority: editedPriority,
-      purchased: !currentStatus, // Alterna o status
+      purchased: !currentStatus, // Alterna o status de comprado
     };
 
-    // A lógica de `purchasedAt` e `purchasedById` é tratada no backend,
-    // então não precisamos nos preocupar com isso aqui.
-
+    // Lógica para o `actualPrice` ao marcar/desmarcar:
+    // Só incluímos `actualPrice` na payload se o usuário tiver permissão para editar campos de colaborador.
+    if (canEditCollaboratorFields) {
+      if (!currentStatus) { // Se o item está sendo marcado como comprado (de false para true)
+        // Prioriza o valor do `editedActualPrice` (se o usuário preencheu o campo de preço real na UI, mesmo fora do modo edição)
+        if (editedActualPrice !== '') {
+          updates.actualPrice = parseNumberInput(editedActualPrice);
+        } else if (item.actualPrice !== null && item.actualPrice !== undefined) {
+          // Mantém o preço real já existente se não houver um novo valor inserido
+          updates.actualPrice = item.actualPrice;
+        } else {
+          // Como último recurso, usa o priceLimit se o actualPrice não estiver definido
+          updates.actualPrice = item.priceLimit;
+        }
+      } else { // Se o item está sendo desmarcado como comprado (de true para false)
+        updates.actualPrice = null; // Limpa o preço real
+      }
+    }
+    
+    // IMPORTANTE: Não incluímos aqui name, quantity, priceLimit etc.
+    // O backend irá usar os valores que já estão no banco de dados para esses campos,
+    // e validará que o usuário não está tentando modificá-los sem permissão.
     onUpdate(itemId, updates);
   };
 
   const handleSaveEdit = () => {
-    // Ao salvar as edições, enviamos todos os campos editados.
-    // O backend já tem a lógica de permissão para aceitar ou rejeitar a atualização de cada campo.
-    onUpdate(item.id, {
-      name: editedName,
-      quantity: parseInt(editedQuantity),
-      priceLimit: parseNumberInput(editedPriceLimit),
-      actualPrice: parseNumberInput(editedActualPrice),
-      notes: editedNotes,
-      category: editedCategory,
-      priority: editedPriority,
-      purchased: item.purchased // Mantém o status de compra atual.
-    });
+    const updatesToSend = {};
+
+    // 1. Campos que SÓ ADMINISTRADORES podem editar (name, quantity, priceLimit)
+    // Esses campos só são adicionados à payload se o usuário tiver canEditAdminFields
+    // E se o valor foi realmente alterado.
+    if (canEditAdminFields) {
+      if (editedName !== item.name) {
+        updatesToSend.name = editedName;
+      }
+      const currentEditedQuantity = parseInt(editedQuantity);
+      if (currentEditedQuantity !== item.quantity) {
+        updatesToSend.quantity = currentEditedQuantity;
+      }
+      const currentEditedPriceLimit = parseNumberInput(editedPriceLimit);
+      if (currentEditedPriceLimit !== item.priceLimit) {
+        updatesToSend.priceLimit = currentEditedPriceLimit;
+      }
+    }
+
+    // 2. Campos que ADMINISTRADORES E COLABORADORES podem editar (actualPrice, notes, category, priority)
+    // Esses campos são adicionados à payload se o usuário tiver canEditCollaboratorFields
+    // E se o valor foi realmente alterado.
+    if (canEditCollaboratorFields) {
+      const currentEditedActualPrice = parseNumberInput(editedActualPrice);
+      if (currentEditedActualPrice !== item.actualPrice) {
+        updatesToSend.actualPrice = currentEditedActualPrice;
+      }
+      if (editedNotes !== item.notes) {
+        updatesToSend.notes = editedNotes;
+      }
+      if (editedCategory !== item.category) {
+        updatesToSend.category = editedCategory;
+      }
+      if (editedPriority !== item.priority) {
+        updatesToSend.priority = editedPriority;
+      }
+    }
+
+    // Se nenhuma alteração foi detectada nos campos permitidos, não faz nada e sai do modo de edição
+    if (Object.keys(updatesToSend).length === 0) {
+      setIsEditing(false);
+      return;
+    }
+
+    // IMPORTANTE: O status 'purchased' não é enviado aqui em handleSaveEdit.
+    // Ele é tratado exclusivamente por handleTogglePurchased, para evitar conflitos
+    // e manter a responsabilidade clara.
+
+    onUpdate(item.id, updatesToSend);
     setIsEditing(false);
   };
 
   const handleCancelEdit = () => {
-    // Ao cancelar, resetamos os estados para os valores originais do item.
+    // Restaura os valores originais do item ao cancelar a edição
     setEditedName(item.name);
     setEditedQuantity(item.quantity);
     setEditedPriceLimit(item.priceLimit !== null && item.priceLimit !== undefined ? item.priceLimit.toString() : '');
@@ -89,14 +139,14 @@ export default function ItemRow({
       <div className="flex-grow">
         {isEditing ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {/* Campos editáveis apenas por admins */}
+            {/* Campos Nome, Quantidade, Preço Sugerido - Apenas Editáveis por Admins */}
             <input
               type="text"
               value={editedName}
               onChange={(e) => setEditedName(e.target.value)}
               className="border p-1 rounded w-full"
               placeholder="Nome"
-              disabled={!canEditAdminFields} 
+              disabled={!canEditAdminFields}
             />
             <input
               type="number"
@@ -105,7 +155,7 @@ export default function ItemRow({
               className="border p-1 rounded w-full"
               min="1"
               placeholder="Quantidade"
-              disabled={!canEditAdminFields} 
+              disabled={!canEditAdminFields}
             />
             <input
               type="number"
@@ -115,10 +165,10 @@ export default function ItemRow({
               step="0.01"
               min="0"
               placeholder="Preço Sugerido"
-              disabled={!canEditAdminFields} 
+              disabled={!canEditAdminFields}
             />
 
-           
+            {/* Campos Preço Real, Notas, Categoria, Prioridade - Editáveis por Admins OU Colaboradores */}
             <input
               type="number"
               value={editedActualPrice}
@@ -127,7 +177,7 @@ export default function ItemRow({
               step="0.01"
               min="0"
               placeholder="Preço Real"
-              disabled={!canEditCollaboratorFields} 
+              disabled={!canEditCollaboratorFields}
             />
             <textarea
               value={editedNotes}
@@ -135,7 +185,7 @@ export default function ItemRow({
               className="border p-1 rounded w-full md:col-span-2"
               placeholder="Notas"
               rows="2"
-              disabled={!canEditCollaboratorFields} 
+              disabled={!canEditCollaboratorFields}
             />
              <input
               type="text"
@@ -143,7 +193,7 @@ export default function ItemRow({
               onChange={(e) => setEditedCategory(e.target.value)}
               className="border p-1 rounded w-full"
               placeholder="Categoria"
-              disabled={!canEditCollaboratorFields} 
+              disabled={!canEditCollaboratorFields}
             />
             <select
               value={editedPriority}
@@ -180,7 +230,7 @@ export default function ItemRow({
       <div className="flex space-x-2 ml-4">
         {isEditing ? (
           <>
-            {/* O botão de salvar edições só deve aparecer se o usuário tiver permissão para editar algo */}
+            {/* O botão de salvar edições só aparece se o usuário tiver permissão para editar algo */}
             {(canEditAdminFields || canEditCollaboratorFields) && (
                 <button onClick={handleSaveEdit} className="text-green-500 hover:text-green-700 p-2" title="Salvar">
                 <FaSave size={20} />
@@ -201,13 +251,13 @@ export default function ItemRow({
                 {item.purchased ? <FaCheckCircle size={20} /> : <FaRegCircle size={20} />}
               </button>
             )}
-             {/* O botão de edição (caneta) só deve aparecer se o usuário tiver permissão para editar algum campo */}
+             {/* O botão de edição (lápis) só aparece se o usuário tiver permissão para editar algum campo */}
              {(canEditAdminFields || canEditCollaboratorFields) && (
               <button onClick={() => setIsEditing(true)} className="text-blue-500 hover:text-blue-700 p-2" title="Editar Item">
                 <FaEdit size={20} />
               </button>
             )}
-             {/* O botão de lixeira (deletar) só deve aparecer se o usuário tiver permissão de admin */}
+             {/* O botão de lixeira (deletar) só aparece se o usuário tiver permissão de admin */}
              {canEditAdminFields && (
               <button onClick={() => onDelete(item.id)} className="text-red-500 hover:text-red-700 p-2" title="Remover Item">
                 <FaTrash size={20} />

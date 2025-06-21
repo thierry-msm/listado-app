@@ -69,6 +69,13 @@ async function updateItem(request, reply) {
 
 
   request.log.info({ updates, listId, itemId, userId }, 'Received item update request'); // Log inicial detalhado
+   request.log.info({
+    event: 'updateItem_request_received',
+    updateBody: updates,
+    params: { listId, itemId },
+    authUserId: userId,
+    authUserEmail: request.user.email // Adiciona email para fácil identificação
+  }, 'Received item update request from frontend');
 
   // Validações básicas de entrada (checa apenas tipos/formatos, não permissões)
   if (updates.quantity !== undefined && (typeof updates.quantity !== 'number' || updates.quantity <= 0)) {
@@ -77,7 +84,7 @@ async function updateItem(request, reply) {
   if (updates.priceLimit !== undefined && (typeof updates.priceLimit !== 'number' || updates.priceLimit < 0)) {
     return reply.status(400).send({ message: 'Preço limite deve ser um número positivo.' });
   }
-  if (updates.actualPrice !== undefined && (typeof updates.actualPrice !== 'number' || updates.actualPrice < 0 && updates.actualPrice !== null)) { // Permite null para actualPrice
+   if (updates.actualPrice !== undefined && updates.actualPrice !== null && (typeof updates.actualPrice !== 'number' || updates.actualPrice < 0)) {
     return reply.status(400).send({ message: 'Preço real deve ser um número positivo ou nulo.' });
   }
   if (updates.purchased !== undefined && typeof updates.purchased !== 'boolean') {
@@ -108,12 +115,34 @@ async function updateItem(request, reply) {
       return reply.status(404).send({ message: 'Item não encontrado nesta lista.' });
     }
 
+       // LOG 2: Detalhes da lista e item encontrados
+    request.log.info({
+      event: 'updateItem_list_item_details',
+      listId: list.id,
+      listOwnerId: list.ownerId,
+      collaborationsFetched: list.collaborations.length,
+      collaborationsList: list.collaborations.map(c => `${c.userId} (${c.role})`), // Lista de colaboradores com suas roles
+      currentItemDetails: { id: currentItem.id, name: currentItem.name, purchased: currentItem.purchased, actualPrice: currentItem.actualPrice }
+    }, 'Fetched list and item details for updateItem');
+
 
     // 2. Determina o papel do usuário na lista
     const isOwner = list.ownerId === userId;
     const userCollaboration = list.collaborations.find(c => c.userId === userId);
     const isAdmin = isOwner || (userCollaboration && userCollaboration.role === 'admin');
     const isCollaborator = userCollaboration && userCollaboration.role === 'collaborator'; // Apenas colaborador, não admin/owner
+
+    // LOG 3: Papéis calculados do usuário
+    request.log.info({
+      event: 'updateItem_user_roles_calculated',
+      authUserId: userId,
+      isOwnerCalculated: isOwner,
+      userCollaborationFound: !!userCollaboration, // True se a colaboração foi encontrada para o user atual
+      userCollaborationRoleFound: userCollaboration ? userCollaboration.role : 'N/A',
+      isAdminCalculated: isAdmin,
+      isCollaboratorCalculated: isCollaborator
+    }, 'Calculated user roles for item update');
+
 
     // 3. Valida as permissões com base no papel e nos campos a serem atualizados
     const allowedUpdates = {}; // Objeto para armazenar apenas os campos permitidos
@@ -122,6 +151,16 @@ async function updateItem(request, reply) {
 
     // Itera sobre os campos que foram enviados na requisição
     for (const field in updates) {
+
+        // LOG 4: Processando cada campo da requisição
+      request.log.debug({
+        event: 'updateItem_processing_field',
+        field: field,
+        value: updates[field],
+        currentIsAdmin: isAdmin,
+        currentIsCollaborator: isCollaborator
+      }, 'Processing field in updates loop');
+
         // Garante que estamos processando propriedades próprias do objeto `updates`
         if (Object.prototype.hasOwnProperty.call(updates, field)) {
             const value = updates[field];
@@ -186,6 +225,15 @@ async function updateItem(request, reply) {
 
             // Se a permissão foi negada para QUALQUER campo, para o processamento e retorna erro
             if (permissionDenied) {
+                  // LOG 5: Retorno de erro por permissão negada
+              request.log.warn({
+                event: 'updateItem_permission_denied_early_exit',
+                authUserId: userId,
+                role: isAdmin ? 'admin' : (isCollaborator ? 'collaborator' : 'none'),
+                deniedField: field,
+                denyMessage: denyMessage
+              }, `Permission denied updating item ${itemId}, exiting early.`);
+
                 request.log.warn({ userId, role: isAdmin ? 'admin' : (isCollaborator ? 'collaborator' : 'none'), field, denyMessage }, `Permission denied updating item ${itemId}`);
                 return reply.status(403).send({ message: denyMessage });
             }
@@ -210,7 +258,6 @@ async function updateItem(request, reply) {
     const finalDataToUpdate = { ...allowedUpdates };
 
     // Lógica específica para o status 'purchased' e campos relacionados ('purchasedBy', 'purchasedAt')
-   
      if (allowedUpdates.hasOwnProperty('purchased') && allowedUpdates.purchased !== undefined) {
       const newPurchasedStatus = allowedUpdates.purchased;
       const oldPurchasedStatus = currentItem.purchased;
@@ -225,6 +272,14 @@ async function updateItem(request, reply) {
       }
     }
 
+      // LOG 6: Dados finais prontos para o Prisma
+    request.log.info({
+      event: 'updateItem_final_data_for_prisma',
+      dataToSave: finalDataToUpdate,
+      targetItemId: itemId,
+      targetListId: listId
+    }, 'Final data prepared for Prisma update');
+
     request.log.info({ finalDataToUpdate, itemId }, 'Final data for Prisma update'); // Log dos dados finais antes do update
 
     // 6. Executa a atualização no banco de dados
@@ -236,8 +291,20 @@ async function updateItem(request, reply) {
       }
     });
 
+     // LOG 7: Sucesso da atualização no Prisma
+    request.log.info({
+      event: 'updateItem_prisma_update_success',
+      updatedItemId: updatedItem.id,
+      updatedItemName: updatedItem.name,
+      updatedItemPurchasedStatus: updatedItem.purchased,
+      updatedItemActualPrice: updatedItem.actualPrice
+    }, 'Prisma item update successful');
+
     request.log.info({ updatedItem }, 'Item updated successfully'); // Log de sucesso
     return reply.status(200).send(updatedItem); // Retorna o item atualizado
+
+
+
 
   } catch (error) {
     request.log.error({ error, listId, itemId, userId }, 'UNEXPECTED Error during item update'); // Log de erro inesperado
