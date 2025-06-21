@@ -67,6 +67,7 @@ async function updateItem(request, reply) {
   const updates = request.body; // O corpo da requisição contém os campos a serem atualizados
   const userId = request.user.id; // ID do usuário autenticado (vem do token JWT)
 
+
   request.log.info({ updates, listId, itemId, userId }, 'Received item update request'); // Log inicial detalhado
 
   // Validações básicas de entrada (checa apenas tipos/formatos, não permissões)
@@ -209,50 +210,20 @@ async function updateItem(request, reply) {
     const finalDataToUpdate = { ...allowedUpdates };
 
     // Lógica específica para o status 'purchased' e campos relacionados ('purchasedBy', 'purchasedAt')
-    // Esta lógica só é aplicada se o campo 'purchased' estava entre os allowedUpdates (ou seja, o usuário tinha permissão para mudá-lo E ele foi enviado)
-    if (allowedUpdates.hasOwnProperty('purchased') && allowedUpdates.purchased !== undefined) {
-        const newPurchasedStatus = allowedUpdates.purchased;
-        const oldPurchasedStatus = currentItem.purchased;
+   
+     if (allowedUpdates.hasOwnProperty('purchased') && allowedUpdates.purchased !== undefined) {
+      const newPurchasedStatus = allowedUpdates.purchased;
+      const oldPurchasedStatus = currentItem.purchased;
 
-        if (newPurchasedStatus === true && oldPurchasedStatus === false) { // O item está sendo marcado como comprado AGORA
-            finalDataToUpdate.purchasedAt = new Date(); // Define a data/hora atual
-            finalDataToUpdate.purchasedById = userId; // Define o usuário logado como quem comprou
-
-            // Se o 'actualPrice' NÃO foi enviado na requisição (com null ou valor > 0)
-            // E o item NÃO tinha um preço real antes, usa o priceLimit como fallback.
-            // Isso cobre o cenário de um clique rápido no toggle sem input de preço.
-             if (!allowedUpdates.hasOwnProperty('actualPrice') || allowedUpdates.actualPrice === undefined) {
-                  // Verifica se o actualPrice já existia no item antes. Se não, usa priceLimit. Se já existia, mantém o antigo.
-                  // A linha `finalDataToUpdate = { ...allowedUpdates };` já copiou o `actualPrice` original se ele existia E não foi enviado no payload.
-                  // Se `actualPrice` foi enviado explicitamente como `null` ou `valor > 0`, ele está em `finalDataToUpdate` e essa lógica de fallback não se aplica.
-                  if (currentItem.actualPrice === null || currentItem.actualPrice === undefined) {
-                       finalDataToUpdate.actualPrice = currentItem.priceLimit; // Usa priceLimit como fallback se não tinha actualPrice
-                  }
-             }
-             // Se 'actualPrice' foi enviado em 'updates', o valor (pode ser null, 0, >0) já está em finalDataToUpdate. Isso está correto.
-
-        } else if (newPurchasedStatus === false && oldPurchasedStatus === true) { // O item está sendo desmarcado como comprado AGORA
-            // Zera os campos relacionados à compra
-            finalDataToUpdate.purchasedAt = null;
-            finalDataToUpdate.purchasedById = null;
-            // Ao desmarcar, o preço real também DEVE ser zerado, a menos que uma lógica diferente seja explicitamente desejada.
-            // Forçamos o actualPrice para null aqui, sobrescrevendo qualquer valor de actualPrice que possa ter vindo em `allowedUpdates` *neste cenário específico de desmarcar*.
-            finalDataToUpdate.actualPrice = null;
-        }
-        // Se newPurchasedStatus === oldPurchasedStatus (usuário clicou no toggle mas o status já era aquele),
-        // a lógica acima não muda purchasedBy/purchasedAt/actualPrice. OK.
-    } else {
-        // Se o campo 'purchased' NÃO foi enviado nos updates permitidos,
-        // garantimos que purchasedBy e purchasedAt são limpos se o item não está comprado atualmente.
-        // Isso lida com edições de outros campos (notas, categoria) em itens NÃO comprados.
-        if (!currentItem.purchased) {
-             finalDataToUpdate.purchasedBy = null;
-             finalDataToUpdate.purchasedAt = null;
-             // Não zera actualPrice aqui, mantém o valor se existir (pode ter sido preenchido manualmente).
-        }
-         // Se o item está comprado E 'purchased' não foi enviado, purchasedBy/purchasedAt/actualPrice permanecem como estão.
+      if (newPurchasedStatus === true && oldPurchasedStatus === false) { // O item está sendo marcado como comprado AGORA
+          finalDataToUpdate.purchasedAt = new Date(); // Define a data/hora atual
+          finalDataToUpdate.purchasedById = userId;   // Define o usuário logado como quem comprou
+      } else if (newPurchasedStatus === false && oldPurchasedStatus === true) { // O item está sendo desmarcado como comprado AGORA
+         
+          finalDataToUpdate.purchasedAt = null;
+          finalDataToUpdate.purchasedById = null;
+      }
     }
-
 
     request.log.info({ finalDataToUpdate, itemId }, 'Final data for Prisma update'); // Log dos dados finais antes do update
 
@@ -273,6 +244,7 @@ async function updateItem(request, reply) {
     return reply.status(500).send({ message: 'Erro interno ao atualizar item.' });
   }
 }
+
 /**
  * Deleta um item de uma lista (soft delete).
  * @param {FastifyRequest} request - Objeto de requisição do Fastify.

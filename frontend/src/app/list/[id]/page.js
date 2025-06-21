@@ -15,7 +15,6 @@ export default function ListPage({ params }) {
  
   const resolvedParams = use(params); // <-- USE React.use() AQUI
   const listId = resolvedParams.id; 
-
   const { isAuthenticated, loading: authLoading, user } = useAuth();
   const router = useRouter();
   const [list, setList] = useState(null);
@@ -173,18 +172,22 @@ export default function ListPage({ params }) {
       </div>
     );
   }
-
-  // Verifica as permissões do usuário logado na lista
+    // Verifica as permissões do usuário logado na lista
   const isOwner = list.ownerId === user.id;
   const userCollaboration = collaborations.find(col => col.userId === user.id);
   const isAdmin = isOwner || (userCollaboration && userCollaboration.role === 'admin');
-  const canEditListDetails = isAdmin; // Apenas admin/owner pode editar nome/descrição da lista
-  const canAddItems = isAdmin; // Apenas admin/owner pode adicionar itens
-  const canEditItemDetails = isAdmin; // Apenas admin/owner pode editar detalhes de itens
-  const canMarkAsPurchased = isAdmin || (userCollaboration && userCollaboration.role === 'collaborator'); // Admin ou colaborador pode marcar como comprado
-  const canRemoveCollaborators = isAdmin; // Apenas admin/owner pode remover colaboradores
-  const canManageRoles = isOwner; // Apenas o proprietário pode gerenciar os papéis
+  const isCollaborator = userCollaboration && userCollaboration.role === 'collaborator'; // Definir explicitamente
 
+  // CORREÇÃO: Novas props de permissão mais granulares para ItemRow
+  const canEditAdminFields = isAdmin; // Para nome, quantidade, preço sugerido
+  const canEditCollaboratorFields = isAdmin || isCollaborator; // Para preço real, notas, categoria, prioridade
+  const canMarkAsPurchased = isAdmin || isCollaborator; // Para marcar/desmarcar
+
+  // As outras permissões (canEditListDetails, canAddItems, canRemoveCollaborators, canManageRoles) permanecem como estão
+  const canEditListDetails = isAdmin;
+  const canAddItems = isAdmin;
+  const canRemoveCollaborators = isAdmin;
+  const canManageRoles = isOwner;
   return (
     <div className="p-6 bg-white rounded-lg shadow-xl min-h-[calc(100vh-80px)]">
       {error && <p className="text-red-500 text-center mb-4">{error}</p>}
@@ -334,13 +337,17 @@ export default function ListPage({ params }) {
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
           {items.map((item) => (
             <ItemRow
-              key={item.id}
+                key={item.id}
               item={item}
               listId={listId}
               onUpdate={handleUpdateItem}
               onDelete={handleDeleteItem}
               canMarkAsPurchased={canMarkAsPurchased}
-              canEditItemDetails={canEditItemDetails}
+              // CORREÇÃO: Passando as novas props de permissão granulares
+              canEditAdminFields={canEditAdminFields}
+              canEditCollaboratorFields={canEditCollaboratorFields}
+              // Passando o ID do usuário atual, útil se o frontend precisar dele para lógicas futuras
+              currentUserId={user.id}
             />
           ))}
         </div>
