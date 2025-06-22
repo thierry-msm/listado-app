@@ -33,8 +33,8 @@ export default function ListPage({ params }) {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showCollaboratorModal, setShowCollaboratorModal] = useState(false);
 
-  // Polling: Intervalo de atualização (a cada 60 segundos)
-  const POLLING_INTERVAL = 60000;
+  // Polling: Intervalo de atualização (a cada 10 segundos)
+  const POLLING_INTERVAL = 10000;
 
   // Função para buscar os dados da lista
   const fetchListData = useCallback(async () => {
