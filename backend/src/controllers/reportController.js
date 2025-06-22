@@ -55,18 +55,28 @@ async function getListExpenseReport(request, reply) {
     let savings = 0; // Diferença entre preço sugerido e real
 
     purchasedItems.forEach(item => {
-      // Se tiver preço real, usa, senão tenta usar o sugerido
-      const actual = item.actualPrice || (item.priceLimit && item.quantity ? item.priceLimit * item.quantity : 0);
-      const estimated = item.priceLimit && item.quantity ? item.priceLimit * item.quantity : 0;
+      // Calculo do custo real do item, considerando a quantidade
+      let itemActualCost = 0;
+      // Se o preço real estiver definido (não null ou undefined), use-o multiplicado pela quantidade
+      if (item.actualPrice !== null && item.actualPrice !== undefined) {
+        itemActualCost = item.actualPrice * item.quantity;
+      } else if (item.priceLimit !== null && item.priceLimit !== undefined) {
+        // Se não há preço real, mas há um preço limite, use-o como uma estimativa real
+        itemActualCost = item.priceLimit * item.quantity;
+      }
+      // Se itemActualCost for 0, ele permanece 0 (nenhum custo ou preço definido)
 
-      totalSpent += actual;
+      totalSpent += itemActualCost; // Soma o custo real calculado para o total
+
+      // Cálculo da estimativa original (já estava correto)
+      const estimated = (item.priceLimit && item.quantity) ? item.priceLimit * item.quantity : 0;
       totalEstimated += estimated;
 
-      if (item.actualPrice && item.priceLimit) {
+      // Cálculo da economia (já estava correto, mas ajustando a condição para ser mais robusta a 0/null/undefined)
+      if (item.actualPrice !== null && item.actualPrice !== undefined && item.priceLimit !== null && item.priceLimit !== undefined) {
         savings += (item.priceLimit - item.actualPrice) * item.quantity;
       }
     });
-
     return reply.status(200).send({
       listId: list.id,
       listName: list.name,
