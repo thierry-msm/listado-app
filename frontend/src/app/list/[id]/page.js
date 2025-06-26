@@ -177,13 +177,9 @@ export default function ListPage({ params }) {
   const userCollaboration = collaborations.find(col => col.userId === user.id);
   const isAdmin = isOwner || (userCollaboration && userCollaboration.role === 'admin');
   const isCollaborator = userCollaboration && userCollaboration.role === 'collaborator'; // Definir explicitamente
-
-  // CORREÇÃO: Novas props de permissão mais granulares para ItemRow
   const canEditAdminFields = isAdmin; // Para nome, quantidade, preço sugerido
   const canEditCollaboratorFields = isAdmin || isCollaborator; // Para preço real, notas, categoria, prioridade
   const canMarkAsPurchased = isAdmin || isCollaborator; // Para marcar/desmarcar
-
-  // As outras permissões (canEditListDetails, canAddItems, canRemoveCollaborators, canManageRoles) permanecem como estão
   const canEditListDetails = isAdmin;
   const canAddItems = isAdmin;
   const canRemoveCollaborators = isAdmin;
